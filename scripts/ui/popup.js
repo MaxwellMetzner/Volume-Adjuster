@@ -13,6 +13,7 @@ const TICK_THRESHOLD_RATIO = 0.075;
 
 const elements = {
   anchorMarker: document.querySelector(".js-anchor-marker"),
+  attentionNote: document.querySelector(".js-attention-note"),
   audibleCount: document.querySelector(".js-audible-count"),
   audibleList: document.querySelector(".js-audible-list"),
   emptyState: document.querySelector(".js-empty-state"),
@@ -32,8 +33,17 @@ const state = {
   activeTab: null,
   activeTabSupported: false,
   currentState: { ...DEFAULT_AUDIO_STATE },
+  initializingCapture: false,
   settings: null
 };
+
+function isDefaultAudioState(audioState) {
+  return (
+    audioState.volume === DEFAULT_AUDIO_STATE.volume &&
+    audioState.mono === DEFAULT_AUDIO_STATE.mono &&
+    audioState.muted === DEFAULT_AUDIO_STATE.muted
+  );
+}
 
 function setControlsDisabled(disabled) {
   elements.volumeRange.disabled = disabled;
@@ -257,6 +267,42 @@ async function applyState(nextState) {
   renderState();
 }
 
+async function initializeCaptureFromPopup() {
+  if (
+    state.initializingCapture ||
+    !state.activeTab?.id ||
+    !state.activeTabSupported ||
+    isDefaultAudioState(state.currentState)
+  ) {
+    return;
+  }
+
+  state.initializingCapture = true;
+
+  try {
+    const mediaStreamId = await chrome.tabCapture.getMediaStreamId({
+      targetTabId: state.activeTab.id
+    });
+
+    const response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.POPUP_APPLY_AUDIO,
+      tabId: state.activeTab.id,
+      url: state.activeTab.url,
+      mediaStreamId,
+      ...state.currentState
+    });
+
+    if (response?.error) {
+      throw new Error(response.error);
+    }
+
+    state.currentState = response;
+    renderState();
+  } finally {
+    state.initializingCapture = false;
+  }
+}
+
 async function loadPopup() {
   const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.POPUP_GET_STATE });
 
@@ -272,10 +318,15 @@ async function loadPopup() {
   elements.volumeRange.min = "0";
   elements.volumeRange.max = String(SLIDER_SCALE);
   elements.volumeRange.step = "1";
+  elements.attentionNote.classList.toggle("is-hidden", !response.needsTabCaptureInit);
   elements.tabsPanel.classList.toggle("is-hidden", !response.settings.showAudibleTabs);
 
   renderOverview();
   renderAudibleTabs(response.audibleTabs);
+
+  if (response.needsTabCaptureInit) {
+    await initializeCaptureFromPopup();
+  }
 }
 
 function bindEvents() {
