@@ -299,7 +299,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   await sendToOffscreen({ type: MESSAGE_TYPES.AUDIO_RELEASE, tabId }, { ensureDocument: false });
-  await chrome.action.setBadgeText({ tabId, text: "" });
 });
 
 chrome.runtime.onInstalled.addListener(() => {
