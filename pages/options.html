@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Volume Adjuster Settings</title>
+  <link rel="stylesheet" href="../styles/options.css">
+</head>
+<body>
+  <main class="settings-shell">
+    <section class="card">
+      <div class="card__head">
+        <h2>Range and stepping</h2>
+        <p>100% stays visually marked on the slider. Set min or max to 100% to disable one side.</p>
+      </div>
+
+      <form class="settings-form js-settings-form">
+        <label class="field">
+          <span class="field__label">Minimum volume</span>
+          <input class="field__input js-min-volume" type="number" min="0" max="100" step="1">
+          <span class="field__hint">Lowest slider value. Use 100% to disable lowering volume.</span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Maximum volume</span>
+          <input class="field__input js-max-volume" type="number" min="100" step="1">
+          <span class="field__hint">Highest slider value. Use 100% to disable boosting above normal.</span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Step below 100%</span>
+          <input class="field__input js-step-below-100" type="number" min="1" max="50" step="1">
+          <span class="field__hint">Use this for quieter-than-normal changes.</span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Step above 100%</span>
+          <input class="field__input js-step-above-100" type="number" min="1" max="50" step="1">
+          <span class="field__hint">Use this for boosted audio changes.</span>
+        </label>
+
+        <label class="check-row">
+          <input class="js-persist-toggle" type="checkbox">
+          <span>Persist settings by hostname</span>
+        </label>
+
+        <label class="check-row">
+          <input class="js-auto-apply-toggle" type="checkbox">
+          <span>Auto-apply saved volume when the page opens again</span>
+        </label>
+
+        <label class="check-row">
+          <input class="js-audible-tabs-toggle" type="checkbox">
+          <span>Show the audible tabs list in the popup</span>
+        </label>
+
+        <div class="actions">
+          <button class="primary-button" type="submit">Save settings</button>
+          <span class="save-state js-save-state" aria-live="polite"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card__head">
+        <h2>Saved sites</h2>
+        <p>Profiles are stored per hostname, for example instagram.com.</p>
+      </div>
+
+      <div class="saved-sites js-saved-sites"></div>
+      <p class="empty-state js-empty-sites is-hidden">No saved site profiles yet.</p>
+
+      <div class="actions actions--split">
+        <button class="secondary-button js-reset-sites" type="button">Clear all saved sites</button>
+      </div>
+    </section>
+  </main>
+
+  <template id="savedSiteTemplate">
+    <article class="saved-site">
+      <div>
+        <h3 class="saved-site__title"></h3>
+        <p class="saved-site__meta"></p>
+      </div>
+      <button class="secondary-button saved-site__remove" type="button">Remove</button>
+    </article>
+  </template>
+
+  <script type="module" src="../scripts/ui/options.js"></script>
+</body>
+</html>

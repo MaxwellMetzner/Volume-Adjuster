@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Tab Volume Adjuster",
+  "short_name": "Tab Volume",
+  "description": "Minimal per-site tab volume control with mono output and persistent settings.",
+  "version": "0.1.0",
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
+  "permissions": [
+    "activeTab",
+    "offscreen",
+    "storage",
+    "tabCapture",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "scripts/background/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png"
+    },
+    "default_popup": "pages/popup.html",
+    "default_title": "Tab Volume Adjuster"
+  },
+  "options_page": "pages/options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "scripts/content/content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}
