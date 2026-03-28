@@ -67,4 +67,3 @@ Minimal browser extension for per-site tab volume control.
 
 - Site-specific profiles are keyed by hostname, for example `instagram.com`.
 - The offscreen document is used so the tab audio graph can stay alive outside the popup lifecycle.
-- Replace the placeholder PNG files in `assets/icons/` with your final brand artwork using the same filenames.
