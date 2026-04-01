@@ -21,7 +21,7 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "scripts/background/service-worker.js",
+    "service_worker": "dist/scripts/background/service-worker.js",
     "type": "module"
   },
   "action": {
@@ -39,7 +39,7 @@
         "<all_urls>"
       ],
       "js": [
-        "scripts/content/content.js"
+        "dist/scripts/content/content.js"
       ],
       "run_at": "document_start"
     }

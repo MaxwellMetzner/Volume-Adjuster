@@ -2,6 +2,15 @@
 
 Minimal browser extension for per-site tab volume control.
 
+## Development
+
+```bash
+npm install
+npm run build
+```
+
+Use `npm run watch` while iterating so the compiled extension files in `dist/` stay up to date.
+
 ## Features
 
 - Minimal popup focused on one job: lower volume, increase volume, and toggle mono output.
@@ -26,19 +35,35 @@ Minimal browser extension for per-site tab volume control.
 |   |-- offscreen.html
 |   |-- options.html
 |   `-- popup.html
+|-- dist/
+|   `-- scripts/
+|       |-- audio/
+|       |   `-- offscreen.js
+|       |-- background/
+|       |   `-- service-worker.js
+|       |-- content/
+|       |   `-- content.js
+|       |-- shared/
+|       |   |-- constants.js
+|       |   |-- storage.js
+|       |   `-- types.js
+|       `-- ui/
+|           |-- options.js
+|           `-- popup.js
 |-- scripts/
 |   |-- audio/
-|   |   `-- offscreen.js
+|   |   `-- offscreen.ts
 |   |-- background/
-|   |   `-- service-worker.js
+|   |   `-- service-worker.ts
 |   |-- content/
-|   |   `-- content.js
+|   |   `-- content.ts
 |   |-- shared/
-|   |   |-- constants.js
-|   |   `-- storage.js
+|   |   |-- constants.ts
+|   |   |-- storage.ts
+|   |   `-- types.ts
 |   `-- ui/
-|       |-- options.js
-|       `-- popup.js
+|       |-- options.ts
+|       `-- popup.ts
 `-- styles/
     |-- options.css
     `-- popup.css
@@ -47,21 +72,24 @@ Minimal browser extension for per-site tab volume control.
 ## File Roles
 
 - `manifest.json`: MV3 entry points and permissions.
+- `dist/scripts/`: Compiled JavaScript consumed by the extension runtime.
 - `assets/icons/`: Placeholder extension icons referenced by the manifest and toolbar.
 - `pages/`: HTML entry points for popup, options, and offscreen audio processing.
-- `scripts/background/service-worker.js`: Coordinates tab state, persistence, and offscreen messaging.
-- `scripts/audio/offscreen.js`: Owns the Web Audio graph for gain control and mono mixing.
-- `scripts/content/content.js`: Notifies the background script when SPA navigation changes the current URL.
-- `scripts/shared/`: Shared constants and storage helpers.
+- `scripts/background/service-worker.ts`: Coordinates tab state, persistence, and offscreen messaging.
+- `scripts/audio/offscreen.ts`: Owns the Web Audio graph for gain control and mono mixing.
+- `scripts/content/content.ts`: Notifies the background script when SPA navigation changes the current URL.
+- `scripts/shared/`: Shared constants, types, and storage helpers.
 - `scripts/ui/`: Popup and options page behavior.
 - `styles/`: Page-specific styles.
 
 ## Load In Chrome
 
-1. Open `chrome://extensions`.
-2. Enable Developer mode.
-3. Choose Load unpacked.
-4. Select this repository folder.
+1. Run `npm install` if dependencies are not installed yet.
+2. Run `npm run build` to generate `dist/`.
+3. Open `chrome://extensions`.
+4. Enable Developer mode.
+5. Choose Load unpacked.
+6. Select this repository folder.
 
 ## Notes
 

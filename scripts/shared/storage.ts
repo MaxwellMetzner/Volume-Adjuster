@@ -6,33 +6,48 @@ import {
   normalizeAudioState,
   normalizeSettings
 } from "./constants.js";
+import type { AudioState, Settings, SiteProfiles } from "./types.js";
 
-export async function readLocal(key, fallbackValue) {
+type StorageShape = {
+  [STORAGE_KEYS.SETTINGS]: Settings;
+  [STORAGE_KEYS.SITE_PROFILES]: SiteProfiles;
+};
+
+async function readLocal<Key extends keyof StorageShape>(
+  key: Key,
+  fallbackValue: StorageShape[Key]
+): Promise<StorageShape[Key]> {
   const storedValue = await chrome.storage.local.get({ [key]: fallbackValue });
-  return storedValue[key];
+  return storedValue[key] as StorageShape[Key];
 }
 
-export async function writeLocal(key, value) {
+async function writeLocal<Key extends keyof StorageShape>(
+  key: Key,
+  value: StorageShape[Key]
+): Promise<void> {
   await chrome.storage.local.set({ [key]: value });
 }
 
-export async function getSettings() {
+export async function getSettings(): Promise<Settings> {
   const storedSettings = await readLocal(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
   return normalizeSettings(storedSettings);
 }
 
-export async function setSettings(nextSettings) {
+export async function setSettings(nextSettings: Partial<Settings>): Promise<Settings> {
   const mergedSettings = normalizeSettings({ ...(await getSettings()), ...nextSettings });
   await writeLocal(STORAGE_KEYS.SETTINGS, mergedSettings);
   return mergedSettings;
 }
 
-export async function getSiteProfiles() {
-  return readLocal(STORAGE_KEYS.SITE_PROFILES, {});
+export async function getSiteProfiles(): Promise<SiteProfiles> {
+  return readLocal(STORAGE_KEYS.SITE_PROFILES, {} as SiteProfiles);
 }
 
-export async function getSiteProfile(urlOrKey, settings = DEFAULT_SETTINGS) {
-  const siteKey = urlOrKey?.includes?.("://") ? getSiteKey(urlOrKey) : urlOrKey;
+export async function getSiteProfile(
+  urlOrKey: string | null | undefined,
+  settings: Readonly<Settings> = DEFAULT_SETTINGS
+): Promise<AudioState | null> {
+  const siteKey = urlOrKey?.includes("://") ? getSiteKey(urlOrKey) : urlOrKey ?? null;
 
   if (!siteKey) {
     return null;
@@ -40,6 +55,7 @@ export async function getSiteProfile(urlOrKey, settings = DEFAULT_SETTINGS) {
 
   const profiles = await getSiteProfiles();
   const candidate = profiles[siteKey];
+
   return candidate
     ? normalizeAudioState(
         { ...candidate, minVolume: settings.minVolume },
@@ -48,8 +64,12 @@ export async function getSiteProfile(urlOrKey, settings = DEFAULT_SETTINGS) {
     : null;
 }
 
-export async function saveSiteProfile(urlOrKey, profile, settings = DEFAULT_SETTINGS) {
-  const siteKey = urlOrKey?.includes?.("://") ? getSiteKey(urlOrKey) : urlOrKey;
+export async function saveSiteProfile(
+  urlOrKey: string | null | undefined,
+  profile: Readonly<AudioState>,
+  settings: Readonly<Settings> = DEFAULT_SETTINGS
+): Promise<AudioState | null> {
+  const siteKey = urlOrKey?.includes("://") ? getSiteKey(urlOrKey) : urlOrKey ?? null;
 
   if (!siteKey) {
     return null;
@@ -75,12 +95,12 @@ export async function saveSiteProfile(urlOrKey, profile, settings = DEFAULT_SETT
   return normalizedProfile;
 }
 
-export async function removeSiteProfile(siteKey) {
+export async function removeSiteProfile(siteKey: string): Promise<void> {
   const profiles = await getSiteProfiles();
   delete profiles[siteKey];
   await writeLocal(STORAGE_KEYS.SITE_PROFILES, profiles);
 }
 
-export async function resetSiteProfiles() {
-  await writeLocal(STORAGE_KEYS.SITE_PROFILES, {});
+export async function resetSiteProfiles(): Promise<void> {
+  await writeLocal(STORAGE_KEYS.SITE_PROFILES, {} as SiteProfiles);
 }

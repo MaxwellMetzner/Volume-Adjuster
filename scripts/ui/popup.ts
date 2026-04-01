@@ -7,29 +7,85 @@ import {
   getSiteLabel,
   snapVolumeToStep
 } from "../shared/constants.js";
+import type {
+  AudioState,
+  AudibleTabSummary,
+  PopupApplyAudioMessage,
+  PopupState,
+  RuntimeErrorResponse,
+  RuntimeRequestMessage,
+  Settings
+} from "../shared/types.js";
+import { isRuntimeErrorResponse } from "../shared/types.js";
 
 const SLIDER_SCALE = 1000;
 const TICK_THRESHOLD_RATIO = 0.075;
 
-const elements = {
-  anchorMarker: document.querySelector(".js-anchor-marker"),
-  attentionNote: document.querySelector(".js-attention-note"),
-  audibleCount: document.querySelector(".js-audible-count"),
-  audibleList: document.querySelector(".js-audible-list"),
-  emptyState: document.querySelector(".js-empty-state"),
-  monoButton: document.querySelector(".js-mono-button"),
-  muteButton: document.querySelector(".js-mute-button"),
-  openSettings: document.querySelector(".js-open-settings"),
-  siteLabel: document.querySelector(".js-site-label"),
-  tabsPanel: document.querySelector(".js-tabs-panel"),
-  template: document.querySelector("#audibleTabTemplate"),
-  tickStrip: document.querySelector(".js-tick-strip"),
-  unsupportedNote: document.querySelector(".js-unsupported-note"),
-  volumeRange: document.querySelector(".js-volume-range"),
-  volumeValue: document.querySelector(".js-volume-value")
+interface PopupElements {
+  anchorMarker: HTMLDivElement;
+  attentionNote: HTMLParagraphElement;
+  audibleCount: HTMLSpanElement;
+  audibleList: HTMLDivElement;
+  emptyState: HTMLParagraphElement;
+  monoButton: HTMLButtonElement;
+  muteButton: HTMLButtonElement;
+  openSettings: HTMLButtonElement;
+  siteLabel: HTMLParagraphElement;
+  tabsPanel: HTMLElement;
+  template: HTMLTemplateElement;
+  tickStrip: HTMLDivElement;
+  unsupportedNote: HTMLParagraphElement;
+  volumeRange: HTMLInputElement;
+  volumeValue: HTMLSpanElement;
+}
+
+interface PopupUiState {
+  activeTab: PopupState["activeTab"];
+  activeTabSupported: boolean;
+  currentState: AudioState;
+  initializingCapture: boolean;
+  settings: Settings | null;
+}
+
+function getRequiredElement<T extends Element>(selector: string, parent: ParentNode = document): T {
+  const element = parent.querySelector<T>(selector);
+
+  if (!element) {
+    throw new Error(`Missing required element: ${selector}`);
+  }
+
+  return element;
+}
+
+async function sendMessage<TResponse>(message: RuntimeRequestMessage): Promise<TResponse> {
+  const response = (await chrome.runtime.sendMessage(message)) as TResponse | RuntimeErrorResponse;
+
+  if (isRuntimeErrorResponse(response)) {
+    throw new Error(response.error);
+  }
+
+  return response;
+}
+
+const elements: PopupElements = {
+  anchorMarker: getRequiredElement<HTMLDivElement>(".js-anchor-marker"),
+  attentionNote: getRequiredElement<HTMLParagraphElement>(".js-attention-note"),
+  audibleCount: getRequiredElement<HTMLSpanElement>(".js-audible-count"),
+  audibleList: getRequiredElement<HTMLDivElement>(".js-audible-list"),
+  emptyState: getRequiredElement<HTMLParagraphElement>(".js-empty-state"),
+  monoButton: getRequiredElement<HTMLButtonElement>(".js-mono-button"),
+  muteButton: getRequiredElement<HTMLButtonElement>(".js-mute-button"),
+  openSettings: getRequiredElement<HTMLButtonElement>(".js-open-settings"),
+  siteLabel: getRequiredElement<HTMLParagraphElement>(".js-site-label"),
+  tabsPanel: getRequiredElement<HTMLElement>(".js-tabs-panel"),
+  template: getRequiredElement<HTMLTemplateElement>("#audibleTabTemplate"),
+  tickStrip: getRequiredElement<HTMLDivElement>(".js-tick-strip"),
+  unsupportedNote: getRequiredElement<HTMLParagraphElement>(".js-unsupported-note"),
+  volumeRange: getRequiredElement<HTMLInputElement>(".js-volume-range"),
+  volumeValue: getRequiredElement<HTMLSpanElement>(".js-volume-value")
 };
 
-const state = {
+const state: PopupUiState = {
   activeTab: null,
   activeTabSupported: false,
   currentState: { ...DEFAULT_AUDIO_STATE },
@@ -37,7 +93,11 @@ const state = {
   settings: null
 };
 
-function isDefaultAudioState(audioState) {
+function handlePopupError(error: unknown): void {
+  console.error("Popup interaction failed", error);
+}
+
+function isDefaultAudioState(audioState: Readonly<AudioState>): boolean {
   return (
     audioState.volume === DEFAULT_AUDIO_STATE.volume &&
     audioState.mono === DEFAULT_AUDIO_STATE.mono &&
@@ -45,13 +105,13 @@ function isDefaultAudioState(audioState) {
   );
 }
 
-function setControlsDisabled(disabled) {
+function setControlsDisabled(disabled: boolean): void {
   elements.volumeRange.disabled = disabled;
   elements.monoButton.disabled = disabled;
   elements.muteButton.disabled = disabled;
 }
 
-function getAnchorRatio(settings) {
+function getAnchorRatio(settings: Readonly<Settings>): number {
   if (
     settings.minVolume >= SETTINGS_LIMITS.normalVolume &&
     settings.maxVolume <= SETTINGS_LIMITS.normalVolume
@@ -70,7 +130,7 @@ function getAnchorRatio(settings) {
   return 0.5;
 }
 
-function volumeToSliderValue(volume, settings) {
+function volumeToSliderValue(volume: number, settings: Readonly<Settings>): number {
   const anchorRatio = getAnchorRatio(settings);
   const anchorValue = Math.round(anchorRatio * SLIDER_SCALE);
 
@@ -93,7 +153,7 @@ function volumeToSliderValue(volume, settings) {
   return Math.round(anchorValue + (SLIDER_SCALE - anchorValue) * upperRatio);
 }
 
-function sliderValueToVolume(sliderValue, settings) {
+function sliderValueToVolume(sliderValue: number, settings: Readonly<Settings>): number {
   const anchorRatio = getAnchorRatio(settings);
   const anchorValue = anchorRatio * SLIDER_SCALE;
 
@@ -114,7 +174,12 @@ function sliderValueToVolume(sliderValue, settings) {
   return SETTINGS_LIMITS.normalVolume + upperRatio * (settings.maxVolume - SETTINGS_LIMITS.normalVolume);
 }
 
-function appendTicks(startVolume, endVolume, step, settings) {
+function appendTicks(
+  startVolume: number,
+  endVolume: number,
+  step: number,
+  settings: Readonly<Settings>
+): void {
   if (startVolume === endVolume || step <= 0) {
     return;
   }
@@ -135,6 +200,7 @@ function appendTicks(startVolume, endVolume, step, settings) {
   }
 
   const direction = startVolume < endVolume ? 1 : -1;
+
   for (
     let volume = startVolume + step * direction;
     direction > 0 ? volume < endVolume : volume > endVolume;
@@ -147,7 +213,7 @@ function appendTicks(startVolume, endVolume, step, settings) {
   }
 }
 
-function renderTicks() {
+function renderTicks(): void {
   if (!state.settings) {
     return;
   }
@@ -169,7 +235,11 @@ function renderTicks() {
   );
 }
 
-function renderState() {
+function renderState(): void {
+  if (!state.settings) {
+    return;
+  }
+
   elements.volumeValue.textContent = formatVolumeLabel(state.currentState.volume);
   elements.volumeRange.value = String(volumeToSliderValue(state.currentState.volume, state.settings));
   elements.monoButton.classList.toggle("is-active", state.currentState.mono);
@@ -178,19 +248,19 @@ function renderState() {
   elements.muteButton.setAttribute("aria-pressed", String(state.currentState.muted));
 }
 
-function renderAudibleTabs(tabs) {
+function renderAudibleTabs(tabs: AudibleTabSummary[]): void {
   elements.audibleList.textContent = "";
   elements.audibleCount.textContent = String(tabs.length);
   elements.emptyState.classList.toggle("is-hidden", tabs.length > 0);
 
   tabs.forEach((tab) => {
-    const fragment = elements.template.content.cloneNode(true);
-    const button = fragment.querySelector(".tab-chip");
-    const icon = fragment.querySelector(".tab-chip__icon");
-    const site = fragment.querySelector(".tab-chip__site");
-    const status = fragment.querySelector(".tab-chip__status");
+    const fragment = elements.template.content.cloneNode(true) as DocumentFragment;
+    const button = getRequiredElement<HTMLButtonElement>(".tab-chip", fragment);
+    const icon = getRequiredElement<HTMLImageElement>(".tab-chip__icon", fragment);
+    const site = getRequiredElement<HTMLSpanElement>(".tab-chip__site", fragment);
+    const status = getRequiredElement<HTMLSpanElement>(".tab-chip__status", fragment);
     const label = tab.title || getSiteLabel(tab.url);
-    const badges = [];
+    const badges: string[] = [];
 
     if (tab.audioState?.mono) {
       badges.push("🔊 Mono");
@@ -218,8 +288,8 @@ function renderAudibleTabs(tabs) {
   });
 }
 
-function renderOverview() {
-  const activeUrl = state.activeTab?.url || "";
+function renderOverview(): void {
+  const activeUrl = state.activeTab?.url ?? "";
   elements.siteLabel.textContent = getSiteLabel(activeUrl);
   elements.unsupportedNote.classList.toggle("is-hidden", state.activeTabSupported);
 
@@ -235,12 +305,12 @@ function renderOverview() {
   renderState();
 }
 
-async function applyState(nextState) {
+async function applyState(nextState: Readonly<AudioState>): Promise<void> {
   if (!state.activeTab?.id || !state.activeTabSupported || !state.settings) {
     return;
   }
 
-  const normalizedState = {
+  const normalizedState: AudioState = {
     volume: snapVolumeToStep(
       clampVolume(nextState.volume, state.settings.maxVolume, state.settings.minVolume),
       state.settings
@@ -252,22 +322,19 @@ async function applyState(nextState) {
   state.currentState = normalizedState;
   renderState();
 
-  const response = await chrome.runtime.sendMessage({
+  const message: PopupApplyAudioMessage = {
     type: MESSAGE_TYPES.POPUP_APPLY_AUDIO,
     tabId: state.activeTab.id,
     url: state.activeTab.url,
     ...normalizedState
-  });
-
-  if (response?.error) {
-    throw new Error(response.error);
-  }
+  };
+  const response = await sendMessage<AudioState>(message);
 
   state.currentState = response;
   renderState();
 }
 
-async function initializeCaptureFromPopup() {
+async function initializeCaptureFromPopup(): Promise<void> {
   if (
     state.initializingCapture ||
     !state.activeTab?.id ||
@@ -283,18 +350,13 @@ async function initializeCaptureFromPopup() {
     const mediaStreamId = await chrome.tabCapture.getMediaStreamId({
       targetTabId: state.activeTab.id
     });
-
-    const response = await chrome.runtime.sendMessage({
+    const response = await sendMessage<AudioState>({
       type: MESSAGE_TYPES.POPUP_APPLY_AUDIO,
       tabId: state.activeTab.id,
       url: state.activeTab.url,
       mediaStreamId,
       ...state.currentState
     });
-
-    if (response?.error) {
-      throw new Error(response.error);
-    }
 
     state.currentState = response;
     renderState();
@@ -303,12 +365,8 @@ async function initializeCaptureFromPopup() {
   }
 }
 
-async function loadPopup() {
-  const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.POPUP_GET_STATE });
-
-  if (response?.error) {
-    throw new Error(response.error);
-  }
+async function loadPopup(): Promise<void> {
+  const response = await sendMessage<PopupState>({ type: MESSAGE_TYPES.POPUP_GET_STATE });
 
   state.activeTab = response.activeTab;
   state.activeTabSupported = response.activeTabSupported;
@@ -329,53 +387,64 @@ async function loadPopup() {
   }
 }
 
-function bindEvents() {
-  elements.openSettings.addEventListener("click", async () => {
-    await chrome.runtime.openOptionsPage();
+function bindEvents(): void {
+  elements.openSettings.addEventListener("click", () => {
+    void chrome.runtime.openOptionsPage().catch(handlePopupError);
   });
 
-  elements.volumeRange.addEventListener("input", async (event) => {
-    await applyState({
-      ...state.currentState,
-      volume: snapVolumeToStep(
-        sliderValueToVolume(Number(event.target.value), state.settings),
-        state.settings
-      )
-    });
-  });
-
-  elements.monoButton.addEventListener("click", async () => {
-    await applyState({
-      ...state.currentState,
-      mono: !state.currentState.mono
-    });
-  });
-
-  elements.muteButton.addEventListener("click", async () => {
-    await applyState({
-      ...state.currentState,
-      muted: !state.currentState.muted
-    });
-  });
-
-  elements.audibleList.addEventListener("click", async (event) => {
-    const button = event.target.closest(".tab-chip");
-
-    if (!button) {
+  elements.volumeRange.addEventListener("input", (event) => {
+    if (!(event.currentTarget instanceof HTMLInputElement) || !state.settings) {
       return;
     }
 
-    await chrome.runtime.sendMessage({
-      type: MESSAGE_TYPES.POPUP_FOCUS_TAB,
-      tabId: Number(button.dataset.tabId)
-    });
+    void applyState({
+      ...state.currentState,
+      volume: snapVolumeToStep(
+        sliderValueToVolume(Number(event.currentTarget.value), state.settings),
+        state.settings
+      )
+    }).catch(handlePopupError);
+  });
 
-    window.close();
+  elements.monoButton.addEventListener("click", () => {
+    void applyState({
+      ...state.currentState,
+      mono: !state.currentState.mono
+    }).catch(handlePopupError);
+  });
+
+  elements.muteButton.addEventListener("click", () => {
+    void applyState({
+      ...state.currentState,
+      muted: !state.currentState.muted
+    }).catch(handlePopupError);
+  });
+
+  elements.audibleList.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+
+    const button = event.target.closest(".tab-chip") as HTMLButtonElement | null;
+    const tabId = button?.dataset.tabId;
+
+    if (!tabId) {
+      return;
+    }
+
+    void sendMessage<void>({
+      type: MESSAGE_TYPES.POPUP_FOCUS_TAB,
+      tabId: Number(tabId)
+    })
+      .then(() => {
+        window.close();
+      })
+      .catch(handlePopupError);
   });
 }
 
 bindEvents();
-loadPopup().catch((error) => {
+void loadPopup().catch((error: unknown) => {
   console.error("Popup failed to load", error);
   elements.siteLabel.textContent = "Unavailable";
   setControlsDisabled(true);

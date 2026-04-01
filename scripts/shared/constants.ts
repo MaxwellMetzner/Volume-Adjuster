@@ -1,3 +1,19 @@
+import type {
+  AudioState,
+  AudioStateCandidate,
+  Settings,
+  SettingsCandidate
+} from "./types.js";
+
+interface SettingsLimits {
+  minStep: number;
+  maxStep: number;
+  minVolume: number;
+  maxBelowNormalVolume: number;
+  normalVolume: number;
+  minMaxVolume: number;
+}
+
 export const OFFSCREEN_DOCUMENT_PATH = "pages/offscreen.html";
 
 export const MESSAGE_TYPES = Object.freeze({
@@ -5,24 +21,21 @@ export const MESSAGE_TYPES = Object.freeze({
   AUDIO_GET_STATE: "audio:get-state",
   AUDIO_RELEASE: "audio:release",
   CONTENT_NAVIGATED: "content:navigated",
-  OPTIONS_GET_DATA: "options:get-data",
-  OPTIONS_REMOVE_PROFILE: "options:remove-profile",
-  OPTIONS_RESET_PROFILES: "options:reset-profiles",
   POPUP_APPLY_AUDIO: "popup:apply-audio",
   POPUP_FOCUS_TAB: "popup:focus-tab",
   POPUP_GET_STATE: "popup:get-state"
-});
+} as const);
 
 export const MESSAGE_TARGETS = Object.freeze({
   OFFSCREEN: "offscreen"
-});
+} as const);
 
 export const STORAGE_KEYS = Object.freeze({
   SETTINGS: "settings",
   SITE_PROFILES: "siteProfiles"
-});
+} as const);
 
-export const DEFAULT_SETTINGS = Object.freeze({
+export const DEFAULT_SETTINGS = Object.freeze<Settings>({
   minVolume: 0,
   maxVolume: 300,
   stepBelow100: 5,
@@ -32,13 +45,13 @@ export const DEFAULT_SETTINGS = Object.freeze({
   showAudibleTabs: true
 });
 
-export const DEFAULT_AUDIO_STATE = Object.freeze({
+export const DEFAULT_AUDIO_STATE = Object.freeze<AudioState>({
   volume: 100,
   mono: false,
   muted: false
 });
 
-export const SETTINGS_LIMITS = Object.freeze({
+export const SETTINGS_LIMITS = Object.freeze<SettingsLimits>({
   minStep: 1,
   maxStep: 50,
   minVolume: 0,
@@ -47,7 +60,12 @@ export const SETTINGS_LIMITS = Object.freeze({
   minMaxVolume: 100
 });
 
-export function clampNumber(value, min, max, fallback) {
+function clampNumber(
+  value: number | string | null | undefined,
+  min: number,
+  max: number,
+  fallback: number
+): number {
   const numericValue = Number(value);
 
   if (!Number.isFinite(numericValue)) {
@@ -57,7 +75,7 @@ export function clampNumber(value, min, max, fallback) {
   return Math.min(max, Math.max(min, numericValue));
 }
 
-export function clampStep(step) {
+export function clampStep(step: number | string | null | undefined): number {
   return Math.round(
     clampNumber(
       step,
@@ -68,7 +86,7 @@ export function clampStep(step) {
   );
 }
 
-export function clampMinVolume(minVolume) {
+export function clampMinVolume(minVolume: number | string | null | undefined): number {
   return Math.round(
     clampNumber(
       minVolume,
@@ -79,7 +97,7 @@ export function clampMinVolume(minVolume) {
   );
 }
 
-export function clampMaxVolume(maxVolume) {
+export function clampMaxVolume(maxVolume: number | string | null | undefined): number {
   const numericValue = Number(maxVolume);
 
   if (!Number.isFinite(numericValue)) {
@@ -90,20 +108,16 @@ export function clampMaxVolume(maxVolume) {
 }
 
 export function clampVolume(
-  volume,
-  maxVolume = DEFAULT_SETTINGS.maxVolume,
-  minVolume = DEFAULT_SETTINGS.minVolume
-) {
+  volume: number | string | null | undefined,
+  maxVolume: number | string | null | undefined = DEFAULT_SETTINGS.maxVolume,
+  minVolume: number | string | null | undefined = DEFAULT_SETTINGS.minVolume
+): number {
   return Math.round(
     clampNumber(volume, clampMinVolume(minVolume), clampMaxVolume(maxVolume), DEFAULT_AUDIO_STATE.volume)
   );
 }
 
-export function getStepForVolume(volume, settings = DEFAULT_SETTINGS) {
-  return volume > SETTINGS_LIMITS.normalVolume ? settings.stepAbove100 : settings.stepBelow100;
-}
-
-export function snapVolumeToStep(volume, settings = DEFAULT_SETTINGS) {
+export function snapVolumeToStep(volume: number, settings: Readonly<Settings> = DEFAULT_SETTINGS): number {
   const minVolume = clampMinVolume(settings.minVolume);
   const maxVolume = clampMaxVolume(settings.maxVolume);
   const normalizedVolume = clampVolume(volume, maxVolume, minVolume);
@@ -116,6 +130,7 @@ export function snapVolumeToStep(volume, settings = DEFAULT_SETTINGS) {
     const distance = SETTINGS_LIMITS.normalVolume - normalizedVolume;
     const steppedValue =
       SETTINGS_LIMITS.normalVolume - Math.round(distance / settings.stepBelow100) * settings.stepBelow100;
+
     return clampVolume(steppedValue, SETTINGS_LIMITS.normalVolume, minVolume);
   }
 
@@ -126,7 +141,7 @@ export function snapVolumeToStep(volume, settings = DEFAULT_SETTINGS) {
   return clampVolume(steppedValue, maxVolume, SETTINGS_LIMITS.normalVolume);
 }
 
-export function normalizeSettings(candidate = {}) {
+export function normalizeSettings(candidate: SettingsCandidate = {}): Settings {
   return {
     ...DEFAULT_SETTINGS,
     ...candidate,
@@ -142,16 +157,28 @@ export function normalizeSettings(candidate = {}) {
   };
 }
 
-export function normalizeAudioState(candidate = {}, maxVolume = DEFAULT_SETTINGS.maxVolume) {
+export function normalizeAudioState(
+  candidate: AudioStateCandidate = {},
+  maxVolume = DEFAULT_SETTINGS.maxVolume
+): AudioState {
   const minVolume = DEFAULT_SETTINGS.minVolume;
+
   return {
-    volume: clampVolume(candidate.volume ?? DEFAULT_AUDIO_STATE.volume, maxVolume, candidate.minVolume ?? minVolume),
+    volume: clampVolume(
+      candidate.volume ?? DEFAULT_AUDIO_STATE.volume,
+      maxVolume,
+      candidate.minVolume ?? minVolume
+    ),
     mono: Boolean(candidate.mono ?? DEFAULT_AUDIO_STATE.mono),
     muted: Boolean(candidate.muted ?? DEFAULT_AUDIO_STATE.muted)
   };
 }
 
-export function isSupportedTabUrl(url) {
+export function isSupportedTabUrl(url: string | null | undefined): url is string {
+  if (!url) {
+    return false;
+  }
+
   try {
     const parsedUrl = new URL(url);
     return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
@@ -160,7 +187,7 @@ export function isSupportedTabUrl(url) {
   }
 }
 
-export function getSiteKey(url) {
+export function getSiteKey(url: string | null | undefined): string | null {
   if (!isSupportedTabUrl(url)) {
     return null;
   }
@@ -169,10 +196,10 @@ export function getSiteKey(url) {
   return parsedUrl.hostname.replace(/^www\./, "").toLowerCase();
 }
 
-export function getSiteLabel(url) {
+export function getSiteLabel(url: string | null | undefined): string {
   return getSiteKey(url) ?? "Unsupported page";
 }
 
-export function formatVolumeLabel(volume) {
+export function formatVolumeLabel(volume: number): string {
   return `${Math.round(volume)}%`;
 }
