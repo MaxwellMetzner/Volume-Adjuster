@@ -1,5 +1,24 @@
 "use strict";
 const CONTENT_NAVIGATED_MESSAGE_TYPE = "content:navigated";
+function getRuntimeMessagingApi() {
+    const runtime = globalThis.chrome?.runtime;
+    if (!runtime?.id || typeof runtime.sendMessage !== "function") {
+        return null;
+    }
+    return runtime;
+}
+function sendNavigationMessage(message) {
+    const runtime = getRuntimeMessagingApi();
+    if (!runtime) {
+        return;
+    }
+    try {
+        void runtime.sendMessage(message).catch(() => undefined);
+    }
+    catch {
+        return;
+    }
+}
 (() => {
     if (window.top !== window) {
         return;
@@ -15,7 +34,7 @@ const CONTENT_NAVIGATED_MESSAGE_TYPE = "content:navigated";
             type: CONTENT_NAVIGATED_MESSAGE_TYPE,
             url: currentUrl
         };
-        void chrome.runtime.sendMessage(message).catch(() => undefined);
+        sendNavigationMessage(message);
     }
     function wrapHistoryMethod(methodName) {
         const originalMethod = history[methodName].bind(history);

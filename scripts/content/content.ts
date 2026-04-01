@@ -5,6 +5,39 @@ interface ContentNavigatedMessage {
   url: string;
 }
 
+interface RuntimeMessagingApi {
+  id?: string;
+  sendMessage(message: ContentNavigatedMessage): Promise<unknown>;
+}
+
+function getRuntimeMessagingApi(): RuntimeMessagingApi | null {
+  const runtime = (globalThis as typeof globalThis & {
+    chrome?: {
+      runtime?: RuntimeMessagingApi;
+    };
+  }).chrome?.runtime;
+
+  if (!runtime?.id || typeof runtime.sendMessage !== "function") {
+    return null;
+  }
+
+  return runtime;
+}
+
+function sendNavigationMessage(message: ContentNavigatedMessage): void {
+  const runtime = getRuntimeMessagingApi();
+
+  if (!runtime) {
+    return;
+  }
+
+  try {
+    void runtime.sendMessage(message).catch(() => undefined);
+  } catch {
+    return;
+  }
+}
+
 (() => {
   if (window.top !== window) {
     return;
@@ -29,7 +62,7 @@ interface ContentNavigatedMessage {
       url: currentUrl
     };
 
-    void chrome.runtime.sendMessage(message).catch(() => undefined);
+    sendNavigationMessage(message);
   }
 
   function wrapHistoryMethod(methodName: HistoryMethodName): void {
